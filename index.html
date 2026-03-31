@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studiekompisen SH - Åk 6 (Stabil)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- React & Babel via CDN - Utvecklingsversioner för maximal stabilitet -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+body { font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
+
+.custom-scrollbar::-webkit-scrollbar { width: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; border: 4px solid transparent; background-clip: content-box; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+#root { height: 100vh; display: flex; overflow: hidden; }
+
+.split-container { display: flex; flex-direction: column; height: 100%; width: 100%; overflow: hidden; }
+
+.panel-text {
+  flex: 0 0 55%;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+  background: white;
+}
+
+.drag-handle {
+  height: 12px;
+  background: #f8fafc;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  z-index: 40;
+  touch-action: none;
+}
+
+.drag-handle::after {
+  content: "";
+  width: 48px;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+.panel-ai {
+  flex: 1;
+  min-height: 100px;
+  overflow-y: auto;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.sidebar-transition {
+  transition: width 0.3s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+.highlight {
+  background: #fffb8f;
+  border-radius: 4px;
+  padding: 0 0.12em;
+}
+.start-highlight {
+  outline: 3px solid #60a5fa;
+  border-radius: 4px;
+}
+</style>
+  
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+<script src="./blocks-data.js"></script>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const BLOCKS = window.BLOCKS_DATA;
+        function App() {
+            const clientIdRef = useRef(localStorage.getItem("clientId") || crypto.randomUUID());
+
+useEffect(() => {
+  localStorage.setItem("clientId", clientIdRef.current);
+}, []);
+            const [activeBlock, setActiveBlock] = useState(0);
+            const [activeSection, setActiveSection] = useState(0);
+            const [aiChat, setAiChat] = useState([]);
+            const [isLoading, setIsLoading] = useState(false);
+            const [fontScale, setFontScale] = useState(1);
+            const [splitPercent, setSplitPercent] = useState(55);
+            const AI_OPEN_PERCENT = 3;  // AI går upp så högt som möjligt
+const AI_DOCK_PERCENT = 85; // AI ligger kvar så knappar syns
+            const [isTeacherMode, setIsTeacherMode] = useState(false);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [history, setHistory] = useState([]);
+            const [showDetail, setShowDetail] = useState(null);
+const [cooldownLeft, setCooldownLeft] = useState(0);
+            const [isSpeaking, setIsSpeaking] = useState(false);
+            const [isPaused, setIsPaused] = useState(false);
+const [speechRate, setSpeechRate] = useState(1.0);
+const utteranceRef = useRef(null);
+            // --- Sök & medföljning ---
+const [searchQ, setSearchQ] = useState("");
+const [currentChar, setCurrentChar] = useState(0);
+const activeRef = useRef(null);
+
+const buildSentenceChunks = (text) => {
+  const t = String(text || "");
+  const parts = t.match(/[^.!?]+[.!?]+|\s*[^.!?]+$/g) || [t];
+  let pos = 0;
+  return parts.map((p) => {
+    const start = pos;
+    pos += p.length;
+    return { start, text: p };
+  });
+};
+
+const escapeReg = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ...existing code...
+const renderWithSearchMarks = (str, q) => {
+  const s = String(str || "");
+  const qq = String(q || "").trim();
+  const parts = s.match(/(\S+|\s+)/g) || [];
+  if (!qq) {
+    return parts.map((part, i) =>
+      part.trim()
+        ? <span key={i} className="word">{part}</span>
+        : <span key={i} className="space">{part}</span>
+    );
+  }
+  const re = new RegExp(escapeReg(qq), "gi");
+  return parts.map((part, i) => {
+    if (!part.trim()) return <span key={i} className="space">{part}</span>;
+    const segs = [];
+    let last = 0, m;
+    while ((m = re.exec(part)) !== null) {
+      const idx = m.index;
+      if (idx > last) segs.push(part.slice(last, idx));
+      segs.push(
+        <mark key={`${i}-${idx}`} className="bg-yellow-200 px-1 rounded">
+          {part.slice(idx, idx + m[0].length)}
+        </mark>
+      );
+      last = idx + m[0].length;
+    }
+    if (last < part.length) segs.push(part.slice(last));
+    return <span key={i} className="word">{segs}</span>;
+  });
+};
+// ...existing code...
+            // --- Klicka i texten & starta från position ---
+// ...existing code...
+const textBodyRef = useRef(null);
+
+const getCaretCharIndexIn = (containerEl) => {
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0) return null;
+
+  const range = sel.getRangeAt(0);
+  const pre = range.cloneRange();
+  pre.selectNodeContents(containerEl);
+  pre.setEnd(range.startContainer, range.startOffset);
+
+  return pre.toString().length;
+};
+
+const speakFromChar = (charIndex) => {
+  const text = String(section.text || "");
+  const start = Math.max(0, Math.min(text.length, Number(charIndex || 0)));
+  const rest = text.slice(start);
+
+  if (!rest) return;
+
+  stopSpeak();
+  setCurrentChar(start);
+  speakText(rest, null, start);
+};
+  
+
+
+// ...existing code...
+// immediate visual mark where user clicked
+
+            useEffect(() => {
+  if (cooldownLeft <= 0) return;
+
+  const t = setInterval(() => {
+    setCooldownLeft((c) => Math.max(0, c - 1));
+  }, 1000);
+
+  return () => clearInterval(t);
+}, [cooldownLeft]);
+const lastRequestRef = useRef(null);            const splitRef = useRef(null);
+const isDragging = useRef(false);
+
+useEffect(() => {
+  const stopDragging = () => {
+    isDragging.current = false;
+  };
+
+  window.addEventListener("mouseup", stopDragging);
+  return () => window.removeEventListener("mouseup", stopDragging);
+}, []);
+            const block = BLOCKS[activeBlock] || BLOCKS[0];
+            const section = block.sections[activeSection] || block.sections[0];
+            // ...existing code...
+useEffect(() => {
+  if (!textBodyRef.current) { window.__wordSpans = []; return; }
+  const update = () => {
+    window.__wordSpans = Array.from(textBodyRef.current.querySelectorAll('span.word, span.space'));
+  };
+  update();
+  const obs = new MutationObserver(update);
+  obs.observe(textBodyRef.current, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('resize', update);
+  return () => { obs.disconnect(); window.removeEventListener('resize', update); window.__wordSpans = []; };
+}, [section.text, searchQ, fontScale]);
+// ...existing code...
+// --- Uppläsning (Web Speech API) STABIL: watchdog mot "tyst-läsning" ---
+const speakSessionRef = useRef(0);
+const lastTextRef = useRef("");
+const lastCharIndexRef = useRef(0);
+const heartbeatRef = useRef(Date.now());
+const watchdogTimerRef = useRef(null);
+const expectedSpeakingRef = useRef(false);
+const lastScrollRef = useRef(0);
+const clearWatchdog = () => {
+  if (watchdogTimerRef.current) {
+    clearInterval(watchdogTimerRef.current);
+    watchdogTimerRef.current = null;
+  }
+};
+
+const hardStop = () => {
+  try {
+    const ss = window.speechSynthesis;
+    if (ss) {
+      ss.cancel();
+      ss.cancel();
+    }
+  } catch (e) {}
+};
+
+const stopSpeak = () => {
+  expectedSpeakingRef.current = false;
+  speakSessionRef.current += 1;
+  clearWatchdog();
+
+  try {
+    const ss = window.speechSynthesis;
+    if (ss) {
+      ss.cancel();
+      ss.cancel();
+    }
+  } catch (e) {}
+
+  utteranceRef.current = null;
+  lastTextRef.current = "";
+  lastCharIndexRef.current = 0;
+  heartbeatRef.current = Date.now();
+
+  if (window.__wordSpans && window.__wordSpans.length) {
+    window.__wordSpans.forEach(s => s.classList.remove('highlight'));
+  }
+
+  setIsSpeaking(false);
+  setIsPaused(false);
+};
+
+const startWatchdog = (sessionId) => {
+  clearWatchdog();
+  watchdogTimerRef.current = setInterval(() => {
+    if (sessionId !== speakSessionRef.current) return;
+
+    const ss = window.speechSynthesis;
+    if (!ss) return;
+
+    // Om den är pausad ska vi inte trigga watchdog
+    if (ss.paused) return;
+
+    // Om vi egentligen inte förväntar oss tal, gör inget
+    if (!expectedSpeakingRef.current) return;
+
+    // Om vi "ska" prata men inget boundary på 1500ms,
+    // då har den troligen hängt i tyst läge
+    const ms = Date.now() - heartbeatRef.current;
+
+    // Ge startfasen lite nåd: om vi ännu inte fått boundary, restartar vi inte
+const idx = lastCharIndexRef.current || 0;
+
+// 1) längre gräns, 2) kräver att vi kommit en bit, 3) kräver att den faktiskt "pågår"
+if ((ss.speaking || ss.pending) && idx > 20 && ms > 2500) {
+  const text = lastTextRef.current;
+
+  const restartFrom = Math.max(0, idx - 30);
+  const rest = text.slice(restartFrom).trim();
+
+  speakSessionRef.current += 1;
+  const newSession = speakSessionRef.current;
+
+  hardStop();
+  utteranceRef.current = null;
+
+  if (rest) {
+    speakText(rest, newSession, restartFrom);
+  } else {
+    stopSpeak();
+  }
+}
+     
+  }, 400);
+};
+// Intern start så vi kan återstarta från mitten
+const speakText = (text, forcedSessionId = null, offset = 0) => {
+// ...existing code...
+const clean = String(text || "");  if (!clean) return;
+
+  if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+    setAiChat((prev) => [
+      { id: Date.now(), role: "error", content: "Uppläsning stöds inte i den här webbläsaren." },
+      ...prev,
+    ]);
+    return;
+  }
+
+  const ss = window.speechSynthesis;
+
+  const sessionId = forcedSessionId ?? (speakSessionRef.current += 1);
+    expectedSpeakingRef.current = true;
+  heartbeatRef.current = Date.now();
+
+  // Om den redan håller på: cancel, men bara då
+  try {
+    if (ss.speaking || ss.pending) ss.cancel();
+  } catch (e) {}
+
+  try {
+    if (ss.paused) ss.resume();
+  } catch (e) {}
+
+  lastTextRef.current = clean;
+  lastCharIndexRef.current = 0; // vi bygger upp den via boundary
+  utteranceRef.current = null;
+
+  const u = new SpeechSynthesisUtterance(" " + clean); // ledande space hjälper mot klipp
+    // Välj svensk röst om den finns (för bättre kvalitet på vissa datorer)
+const voices = ss.getVoices?.() || [];
+const bestSv =
+  voices.find(v => (v.lang || "").toLowerCase().startsWith("sv") && /enhanced|premium|natural|neural|google|microsoft/i.test(v.name)) ||
+  voices.find(v => (v.lang || "").toLowerCase().startsWith("sv"));
+
+if (bestSv) u.voice = bestSv;
+  u.lang = "sv-SE";
+  u.rate = Number(speechRate || 1.0);
+  u.pitch = 1.0;
+  u.volume = 1.0;
+
+  const safeEnd = () => {
+  if (sessionId !== speakSessionRef.current) return;
+  expectedSpeakingRef.current = false;
+  clearWatchdog();
+  utteranceRef.current = null;
+  setIsSpeaking(false);
+  setIsPaused(false);
+};
+
+// ...existing code...
+u.onboundary = (e) => {
+  if (e.charIndex == null) return;
+  const utterOffset = Number(offset || 0);
+  const leadingSpace = String(u.text || "").startsWith(" ");
+  const localChar = Math.max(0, e.charIndex - (leadingSpace ? 1 : 0));
+  const globalIndex = utterOffset + localChar;
+  lastCharIndexRef.current = globalIndex;
+  heartbeatRef.current = Date.now();
+
+  const cleanText = String(lastTextRef.current || '').replace(/\r\n/g, '\n');
+  const idx = Math.min(globalIndex, Math.max(0, cleanText.length - 1));
+
+  if (window.__wordSpans && window.__wordSpans.length) {
+    const spans = window.__wordSpans;
+    let cum = 0, found = null;
+    for (let i = 0; i < spans.length; i++) {
+      const len = spans[i].textContent.length;
+      if (idx >= cum && idx < cum + len) { found = spans[i]; break; }
+      cum += len;
+    }
+    if (found) {
+      spans.forEach(s => s.classList.remove('highlight'));
+      found.classList.add('highlight');
+
+      // Scroll only if not visible and throttle to avoid continuous jumps
+      const container = textBodyRef && textBodyRef.current;
+      const now = Date.now();
+      const THROTTLE_MS = 250;
+      if (container) {
+        const fRect = found.getBoundingClientRect();
+        const cRect = container.getBoundingClientRect();
+        const visible = fRect.top >= cRect.top && fRect.bottom <= cRect.bottom;
+        if (!visible && (now - lastScrollRef.current) > THROTTLE_MS) {
+          found.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+          lastScrollRef.current = now;
+        }
+      } else if ((now - lastScrollRef.current) > THROTTLE_MS) {
+        found.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+        lastScrollRef.current = now;
+      }
+
+      return;
+    }
+  }
+
+  // fallback: procentbaserad scroll
+  const percent = idx / (cleanText.length || 1);
+  const container = textBodyRef && textBodyRef.current;
+  if (container) {
+    container.scrollTop = percent * (container.scrollHeight - container.clientHeight);
+  }
+};
+// ...existing code...
+
+  u.onend = safeEnd;
+  u.onerror = safeEnd;
+
+  utteranceRef.current = u;
+  setIsSpeaking(true);
+  setIsPaused(false);
+
+  startWatchdog(sessionId);
+
+  setTimeout(() => {
+    if (sessionId !== speakSessionRef.current) return;
+    try {
+      ss.speak(u);
+    } catch (e) {
+      safeEnd();
+    }
+  }, 80);
+};
+
+const pauseSpeak = () => {
+  try {
+    const ss = window.speechSynthesis;
+    if (ss?.speaking && !ss?.paused) {
+      ss.pause();
+      setIsPaused(true);
+    }
+  } catch (e) {}
+};
+
+const resumeSpeak = () => {
+  try {
+    const ss = window.speechSynthesis;
+    if (ss?.paused) {
+      ss.resume();
+      setIsPaused(false);
+      heartbeatRef.current = Date.now(); // så watchdog inte triggar direkt
+    }
+  } catch (e) {}
+};
+
+
+
+const toggleSpeak = () => {
+  if (isSpeaking && isPaused) {
+    resumeSpeak();
+    return;
+  }
+
+  if (isSpeaking && !isPaused) {
+    pauseSpeak();
+    return;
+  }
+
+  const selected = (window.getSelection?.().toString() || "").trim();
+  if (selected) {
+  speakText(selected);
+  return;
+}
+
+speakFromChar(currentChar || 0);
+};
+  
+            useEffect(() => {
+  // stoppa uppläsning när man byter sida eller block
+  stopSpeak();
+  // eslint-varning finns inte här, men vi vill köra på sidbyte
+  // kör bara vid sidbyte
+}, [activeBlock, activeSection]);
+            // --- FIX: Robust ikon-rendering med try/catch ---
+            useEffect(() => {
+                if (!window.lucide?.createIcons) return;
+                try {
+                    window.lucide.createIcons();
+                } catch (e) {
+                    console.warn("Lucide fail:", e);
+                }
+            },  [aiChat, isSidebarOpen, isTeacherMode, showDetail, activeBlock, activeSection]);
+
+            const askAI = async (type, queryText = "") => {
+                // Cooldown, om vi har nedräkning kvar så gör inget
+if (cooldownLeft > 0) {
+  setAiChat(prev => [
+    { id: Date.now(), role: 'error', content: `Vänta ${cooldownLeft}s innan du frågar igen.` },
+    ...prev
+  ]);
+  return;
+}
+                if (isLoading) return;
+                setSplitPercent(AI_OPEN_PERCENT);
+const userMsgText =
+  queryText ||
+  (type === 'simplify'
+    ? 'Förenkla texten'
+    : type === 'deepen'
+    ? 'Fördjupa & samband'
+    : type === 'reason'
+    ? 'Resonera'
+    : 'Fråga');                const userMsgId = Date.now();
+                
+                // --- FIX: Visa elevens fråga direkt för feedback ---
+                setAiChat(prev => [{ id: userMsgId, role: 'user', content: userMsgText }, ...prev]);
+setIsLoading(true);
+setCooldownLeft(10);
+                // --- FIX: Kapa textbanken för att aldrig skicka för mycket ---
+const TEXTBANK = (section.text || "");
+let CONTEXT = TEXTBANK;
+
+if (type === "reason") {
+  // ta med hela blockets text (alla sektioner) som underlag
+  CONTEXT = (block.sections || [])
+    .map((s) => `SIDA ${s.page}: ${s.text || ""}`)
+    .join("\n\n")
+    .slice(0, 20000); // håll nere storleken
+} else {
+  CONTEXT = TEXTBANK.slice(0, 8000);
+}
+                let sysPrompt = "";
+                let q = "";
+
+                if (type === 'simplify') {
+                    sysPrompt = `Du är Studiekompisen AI. Förenkla språket extremt mycket. REGLER: 1) KORTA stycken. 2) PUNKTLYSTOR. 3) Enkel svenska. Källa: sida ${section.page}. TEXTBANK: "${CONTEXT}"`;
+                    q = "Gör texten jättelätt att förstå.";
+                } else if (type === 'deepen' || type === 'develop') {
+                    sysPrompt = `Du är Studiekompisen AI. Fördjupa förståelsen. REGLER: 1) Fokusera på SAMBAND. 2) KONSEKVENSER. 3) Ställ en utmanande följdfråga. Källa: sida ${section.page}. TEXTBANK: "${CONTEXT}"`;
+                    q = "Hjälp mig fördjupa mig i sambanden i texten.";
+                    }
+                    else if (type === 'reason') {
+    sysPrompt = `Du är Studiekompisen AI och hjälper elever i årskurs 6 att förstå hur man RESONERAR i samhällskunskap.
+
+REGLER:
+1. Använd bara information från TEXTBANK.
+2. Visa hur man kan tänka steg för steg.
+3. Förklara samband mellan saker.
+4. Använd enkel svenska.
+5. Skriv inte ett facit.
+
+UPPGIFT:
+Visa hur man kan resonera utifrån texten.
+
+STRUKTUR:
+• Börja med "Så här kan man tänka:"
+• Visa 3–5 steg i resonemanget
+• Visa samband eller konsekvenser
+• Avsluta med en tänkfråga
+
+Om texten inte räcker:
+Skriv "Det finns för lite information i texten för att resonera vidare."
+
+TEXTBANK: "${CONTEXT}"`;
+
+    q = "Visa hur man kan resonera utifrån texten.";
+}
+                 else if (type === 'concept') {
+                    sysPrompt = `Du är Studiekompisen AI. Förklara begreppet på enkel svenska utifrån texten. Källa: sida ${section.page}. TEXTBANK: "${CONTEXT}"`;
+                    q = `Förklara begreppet "${queryText}".`;
+                } else {
+                    sysPrompt = `Du är Studiekompisen AI. Coacha med frågor. Källa: sida ${section.page}. TEXTBANK: "${CONTEXT}"`;
+                    q = queryText || "Ge ett vardagligt exempel.";
+                }
+
+                try {
+                    // --- FIX: Ingen 'model' i JSON för att inte krocka med backend ---
+                    const res = await fetch(`/.netlify/functions/gemini`, {
+                        method: 'POST',
+                       headers: {
+  'Content-Type': 'application/json',
+  'X-Client-Id': clientIdRef.current
+},
+                        body: JSON.stringify({ q, systemPrompt: sysPrompt })
+                    });
+                    
+                    if (!res.ok) {
+                        const errBody = await res.text();
+                        throw new Error(`Serverfel (HTTP ${res.status}): ${errBody.substring(0, 100)}`);
+                    }
+                    
+                   const data = await res.json();
+const aiResponse = (data && typeof data.text === "string") ? data.text : "AI gav inget svar.";
+                    
+                    setAiChat(prev => [{ id: Date.now(), role: 'ai', content: aiResponse, query: userMsgText }, ...prev]);
+                    setHistory(prev => [{ s: section.page, q: userMsgText, a: aiResponse }, ...prev]);
+                } catch (err) {
+  // Om vi blir rate-limitade (429), starta cooldown
+  const msg = String(err?.message || "");
+  if (msg.includes("HTTP 429") || msg.includes("429")) {
+setCooldownLeft((c) => Math.max(c, 90));  }
+
+  setAiChat(prev => [
+    { id: Date.now(), role: 'error', content: `Hoppsan! Kunde inte hämta svar (${err.message}).` },
+    ...prev
+  ]);
+} finally {
+                    setIsLoading(false);
+                }
+            };
+
+const removeMsg = (id) => setAiChat(prev => prev.filter(m => m.id !== id));
+
+const openAI = () => setSplitPercent(AI_OPEN_PERCENT);   // upp (visar AI)
+const dockAI = () => setSplitPercent(AI_DOCK_PERCENT);   // ner (döljer AI)
+
+const toggleAI = () => {
+  if (splitPercent < AI_DOCK_PERCENT) {
+    dockAI();  // allt som inte är helt nere -> dölj
+  } else {
+    openAI();  // om den är nere -> visa
+  }
+};
+            return (
+                <div className="flex w-full h-full text-left" 
+                    onMouseMove={(e) => {
+                        if (!isDragging.current) return;
+                        const rect = splitRef.current.getBoundingClientRect();
+                        const y = e.clientY - rect.top;
+                        let p = (y / rect.height) * 100;
+setSplitPercent(Math.max(3, Math.min(97, p)));                    }}
+                    onMouseUp={() => isDragging.current = false}
+                >
+                    <aside className={`bg-white border-r flex flex-col shrink-0 z-50 sidebar-transition ${isSidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'}`}>
+                        <div className="p-8 bg-indigo-700 text-white flex flex-col items-start">
+                            <div className="flex items-center gap-3">
+                                <span className="bg-white p-2 rounded-lg text-indigo-700"><i data-lucide="graduation-cap"></i></span>
+                                <h1 className="text-xl font-black uppercase italic leading-none">Studiekompisen</h1>
+                            </div>
+                            <p className="text-[10px] mt-2 opacity-70 uppercase font-bold tracking-widest text-left">Utkik SO Åk 6</p>
+                        </div>
+                        <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-1">
+                            {BLOCKS.map((b, i) => (
+                                <button key={i} onClick={() => { setActiveBlock(i); setActiveSection(0); setAiChat([]); setShowDetail(null); }}
+                                    className={`w-full flex items-center gap-3 p-4 rounded-2xl transition-all font-bold text-xs ${activeBlock === i ? 'bg-indigo-50 text-indigo-700 ring-2 ring-indigo-100' : 'text-slate-500 hover:bg-slate-50'} text-left`}>
+                                    <span className="p-2 bg-slate-100 rounded-lg"><i data-lucide={b.icon || "circle"}></i></span>
+                                    <span className="whitespace-nowrap leading-tight">{b.title}</span>
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="p-4 border-t text-left text-left">
+                            <button onClick={() => setIsTeacherMode(!isTeacherMode)} className="w-full p-3 rounded-xl bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest flex justify-between items-center text-left">
+                                Lärarlogg <i data-lucide={isTeacherMode ? "eye" : "eye-off"}></i>
+                            </button>
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 flex flex-col relative bg-white overflow-hidden text-left" ref={splitRef}>
+                        <header className="bg-white/90 border-b p-4 flex items-center justify-between z-10 shrink-0 text-left text-left">
+                            <div className="flex items-center gap-4 overflow-hidden text-left text-left">
+                                <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 shrink-0"><i data-lucide={isSidebarOpen ? "panel-left-close" : "panel-left-open"}></i></button>
+                                <div className="flex gap-2 overflow-x-auto no-scrollbar text-left">
+                                    {block.sections.map((s, i) => (
+                                        <button key={i} onClick={() => { setActiveSection(i); setAiChat([]); setShowDetail(null); }}
+                                            className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeSection === i ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                                            {s.title}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase border border-indigo-100 ml-2">Sida {section.page}</div>
+                        </header>
+
+                        <div className="split-container text-left text-left">
+                            <div className="panel-text custom-scrollbar text-left text-left" style={{ flexBasis: `${splitPercent}%` }}>
+                                <div className="max-w-4xl mx-auto p-8 space-y-12 pb-20 text-left text-left">
+                                   
+
+                                    <section className="bg-white p-12 rounded-[4rem] shadow-2xl border border-slate-100 relative animate-fade-in text-left text-left">
+                                        <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600 text-left text-left"></div>
+<div className="flex gap-2 mb-4"><button onClick={() => setFontScale(fontScale - 0.1)}>A-</button><button onClick={() => setFontScale(1)}>A</button><button onClick={() => setFontScale(fontScale + 0.1)}>A+</button></div>                                        
+<p
+  ref={textBodyRef}
+  onMouseUp={() => {
+    const i = getCaretCharIndexIn(textBodyRef.current);
+const sel = (window.getSelection?.().toString() || "").trim();
+if (sel) return;
+if (i != null) setCurrentChar(i);  }}
+style={{ fontSize: `${fontScale}em` }} className="leading-[1.8] text-slate-700 font-bold whitespace-pre-wrap cursor-text">
+  {renderWithSearchMarks(section.text, searchQ)}
+</p>                                     <div className="mt-6 flex flex-wrap gap-3">
+  <button
+    onClick={toggleSpeak}
+    className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg bg-slate-900 text-white"
+  >
+    <i
+      data-lucide={isSpeaking ? (isPaused ? "play" : "pause") : "volume-2"}
+      className="w-4 h-4"
+    ></i>
+    {isSpeaking ? (isPaused ? "Fortsätt" : "Pausa") : "Läs upp"}
+  </button>
+
+  <button
+    disabled={!isSpeaking}
+    onClick={stopSpeak}
+    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg ${
+      !isSpeaking ? "bg-slate-300 text-white cursor-not-allowed" : "bg-red-600 text-white"
+    }`}
+  >
+    <i data-lucide="square" className="w-4 h-4"></i>
+    Stoppa
+  </button>
+</div>
+
+<div className="mt-3 flex items-center gap-3">
+  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+    Hastighet
+  </span>
+
+ <input
+  type="range"
+  min="0.5"
+  max="2.0"
+  step="0.1"
+  value={speechRate}
+  onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
+  onMouseUp={() => {
+    // Applicera ny hastighet när man släpper, inte hela tiden
+    if (isSpeaking) {
+      const selected = (window.getSelection?.().toString() || "").trim();
+      stopSpeak();
+      speakText(selected || section.text || "");
+    }
+  }}
+  onTouchEnd={() => {
+    if (isSpeaking) {
+      const selected = (window.getSelection?.().toString() || "").trim();
+      stopSpeak();
+      speakText(selected || section.text || "");
+    }
+  }}
+  className="w-48"
+/>
+
+  <span className="text-[10px] font-black text-slate-500">
+    {speechRate.toFixed(2)}x
+  </span>
+</div>
+                                        <div className="mt-14 pt-10 border-t-2 border-slate-50 text-left text-left text-left">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase mb-5">Begrepp (klicka för förklaring):</p>
+                                            <div className="flex flex-wrap gap-2 text-left">{(section.concepts || []).map((c, i) => <button key={i} onClick={() => askAI('concept', c)} className="px-5 py-2.5 bg-indigo-50 text-indigo-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 text-left">{c}</button>)}</div>
+                                        </div>
+                                    </section>
+
+                                  
+
+                                   
+                                </div>
+                            </div>
+
+                            <div className="drag-handle" onMouseDown={(e) => { isDragging.current = true; e.preventDefault(); }}></div>
+
+                            <div className="panel-ai custom-scrollbar p-8 text-left text-left text-left text-left text-left">
+                                <div className="max-w-4xl mx-auto w-full space-y-6 text-left text-left">
+                                   <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+  <button
+    onClick={toggleAI}
+    className="bg-slate-200 text-slate-700 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg shrink-0"
+  >
+    <i data-lucide={splitPercent > 70 ? "chevron-up" : "chevron-down"} className="w-4 h-4"></i>
+    {splitPercent > 70 ? "Visa AI" : "Dölj AI"}
+  </button>
+
+  <button
+  disabled={cooldownLeft > 0}
+  onClick={() => askAI('simplify')}
+  className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg shrink-0 ${
+    cooldownLeft > 0 ? "bg-blue-300 text-white cursor-not-allowed" : "bg-blue-600 text-white"
+  }`}
+>
+    <i data-lucide="sparkles" className="w-4 h-4"></i>
+{cooldownLeft > 0 ? `Vänta ${cooldownLeft}s` : "Förenkla texten"}  </button>
+
+  <button
+  disabled={cooldownLeft > 0}
+  onClick={() => askAI('deepen')}
+  className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg shrink-0 ${
+    cooldownLeft > 0 ? "bg-emerald-300 text-white cursor-not-allowed" : "bg-emerald-600 text-white"
+  }`}
+>
+    <i data-lucide="brain" className="w-4 h-4"></i>
+{cooldownLeft > 0 ? `Vänta ${cooldownLeft}s` : "Fördjupa & samband"}
+  </button>
+
+ <button
+  disabled={cooldownLeft > 0}
+onClick={() => askAI('reason')}  className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 shadow-lg shrink-0 ${
+    cooldownLeft > 0 ? "bg-slate-400 text-white cursor-not-allowed" : "bg-slate-900 text-white"
+  }`}
+>
+    <i data-lucide="message-square" className="w-4 h-4"></i>
+{cooldownLeft > 0 ? `Vänta ${cooldownLeft}s` : "Resonera"}  </button>
+</div>
+                                    
+                                    {isLoading && <div className="flex justify-start text-left text-left text-left text-left text-left text-left text-left text-left"><div className="bg-white p-6 rounded-[2rem] flex items-center gap-5 shadow-xl text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin text-left text-left text-left text-left"></div><span className="text-[10px] font-black text-indigo-400 uppercase animate-pulse italic text-left text-left text-left text-left text-left text-left text-left">Studerar boken...</span></div></div>}
+
+                                    <div className="space-y-6 flex flex-col text-left text-left text-left">
+                                        {aiChat.map((m) => (
+                                            <div key={m.id} className="animate-fade-in group relative text-left text-left text-left">
+                                                <div className={`p-7 rounded-[2rem] text-sm font-bold shadow-xl leading-relaxed ${m.role === 'error' ? 'bg-red-50 text-red-600 border-red-100' : m.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-none text-right' : 'bg-white border-2 text-slate-800 border-slate-50'}`}>
+                                                    <div className="flex justify-between items-start mb-3 text-left text-left text-left">
+                                                        <div className={`text-[9px] uppercase tracking-widest font-black opacity-60 ${m.role === 'user' ? 'text-indigo-200' : m.role === 'error' ? 'text-red-500' : 'text-indigo-500'}`}>
+                                                            {m.role === 'user' ? 'Din fråga' : m.role === 'ai' ? `Hjälp med ${m.query}` : 'Systemfel'}
+                                                        </div>
+                                                        <button onClick={() => removeMsg(m.id)} className="p-1 hover:bg-black/10 rounded-full text-current opacity-40 hover:opacity-100 transition-all text-left text-left text-left text-left text-left">
+                                                            <i data-lucide="x" className="w-4 h-4 text-left text-left text-left text-left text-left text-left"></i>
+                                                        </button>
+                                                    </div>
+<div
+  className="whitespace-pre-wrap text-left"
+  dangerouslySetInnerHTML={{
+    __html: m.content.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+  }}
+></div>                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {isTeacherMode && (
+                        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-2xl z-[100] flex items-center justify-center p-10 text-left text-left text-left text-left text-left text-left text-left text-left text-left">
+                            <div className="bg-white w-full max-w-6xl h-[90vh] rounded-[5rem] flex flex-col overflow-hidden border-4 border-white shadow-2xl text-left text-left text-left text-left text-left text-left text-left text-left text-left">
+                                <header className="p-14 border-b flex justify-between items-center bg-slate-50/50 text-left text-left text-left text-left text-left text-left">
+                                    <h2 className="text-4xl font-black uppercase italic text-slate-900 leading-none text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">Kontrollpanel</h2>
+                                    <button onClick={() => setIsTeacherMode(false)} className="bg-white p-5 rounded-full border-2 border-slate-100 hover:text-red-500 transition-all shadow-sm text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><i data-lucide="x"></i></button>
+                                </header>
+                                <div className="flex-1 overflow-y-auto p-14 custom-scrollbar text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">
+                                    <table className="w-full text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">
+                                        <thead className="bg-slate-50 text-[11px] font-black text-slate-500 uppercase italic border-b-4 border-white text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left"><tr><th className="p-10 text-left text-left text-left text-left text-left text-left">Sida</th><th className="p-10 text-left text-left text-left text-left text-left text-left text-left text-left">Input</th><th className="p-10 text-left text-left text-left text-left text-left text-left text-left text-left text-left">Svar</th></tr></thead>
+                                        <tbody className="text-base font-bold text-slate-600 divide-y-4 divide-slate-50 text-left text-left text-left text-left text-left text-left text-left text-left text-left">
+                                            {history.map((h, i) => (
+                                                <tr key={i} className="hover:bg-indigo-50/30 transition-colors text-left text-left text-left text-left text-left">
+                                                    <td className="p-10 text-xs font-black italic whitespace-nowrap text-left text-left text-left text-left text-left text-left">SIDA {h.s}</td>
+                                                    <td className="p-10 italic text-slate-900 text-lg text-left text-left text-left text-left text-left text-left text-left text-left">"{h.q}"</td>
+                                                    <td className="p-10 text-sm font-medium opacity-60 leading-relaxed max-w-lg text-left text-left text-left text-left text-left text-left text-left text-left text-left text-left">{h.a}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // --- GLOBAL ERROR LISTENERS (FÖRE RENDER) ---
+        window.addEventListener("error", (e) => console.log("JS ERROR:", e.error || e.message));
+        window.addEventListener("unhandledrejection", (e) => console.log("PROMISE ERROR:", e.reason));
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
