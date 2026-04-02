@@ -114,113 +114,43 @@ Ett exempel kan vara att någon misstänks för att ha förstört något i skola
         application: `Förklara vad som händer efter att polisen har utrett ett brott.`
       },
       {
-        title: "Sida 4: Domstolen",
-        page: 4,
-        track: "Båda",
-        core: true,
-        text: `När ett fall går vidare till domstol är det dags att avgöra vad som är rätt enligt lagen. Domstolen är den del av rättssystemet som bestämmer om en person ska dömas eller frias.
+  title: "Sida 4: Domstolen",
+  page: 4,
+  track: "Båda",
+  core: true,
+  text: `Tänk dig att ett fall nu har kommit hela vägen till domstolen. Polisen har utrett vad som hänt och åklagaren har bestämt att det finns tillräckligt med bevis för att gå vidare. Nu är det domstolens uppgift att avgöra vad som faktiskt är rätt enligt lagen. Det är här beslutet tas om en person ska dömas eller inte.
 
-Domstolen lyssnar på det som åklagaren och den åtalade säger. Den granskar också bevisen. Domstolen ska inte gissa eller gå på känslor. Den ska fatta beslut utifrån lagar och det som går att bevisa.
+Domstolen har en särskild roll i rättssystemet. Den ska vara opartisk, vilket betyder att den inte får hålla på någon sida. Domstolen ska inte tro mer på åklagaren eller den åtalade, utan ska istället lyssna på båda och jämföra deras berättelser med de bevis som finns. Det gör att beslutet blir mer rättvist.
 
-En viktig regel är att domstolen ska vara opartisk. Det betyder att den inte ska hålla på någon sida. Den ska behandla alla lika och fatta beslut på ett rättvist sätt.
+När domstolen prövar ett fall tittar den noggrant på vad som går att bevisa. Det räcker inte att något verkar troligt eller att många tycker samma sak. Domstolen måste kunna säga att det är bevisat enligt lagen. Domstolen måste vara säker på att bevisen räcker för att döma. Om det inte går att visa tydligt, får personen inte dömas.
 
-När domstolen har gått igenom allt fattar den ett beslut som kallas dom. Domen kan vara att personen fälls eller frias. Att fällas betyder att personen döms. Att frias betyder att personen inte döms.
+Ett exempel kan vara att två personer berättar olika saker om samma händelse. Den ena säger att ett brott har skett, medan den andra säger att det inte stämmer. Då måste domstolen väga deras berättelser mot de bevis som finns, till exempel vittnen eller andra spår.
 
-Ett exempel är om två personer säger olika saker om vad som hänt. Då måste domstolen avgöra vilken version som stämmer bäst med bevisen.`,
-        concepts: ["domstol", "dom", "frias", "fällas", "opartisk"],
-        mustKnow: [
-          "Domstolen avgör om någon ska dömas.",
-          "Domstolen använder lagar och bevis.",
-          "Domstolen ska vara opartisk.",
-          "Domen visar om någon fälls eller frias."
-        ],
-        summary: [
-          "Domstolen avgör skuld.",
-          "Den granskar bevis och berättelser.",
-          "Den ska vara rättvis och opartisk.",
-          "Den meddelar en dom."
-        ],
-        test: [
-          { q: "Vad gör domstolen?", a: "Avgör om någon ska dömas." },
-          { q: "Vad är en dom?", a: "Domstolens beslut." },
-          { q: "Vad betyder frias?", a: "Att inte dömas." },
-          { q: "Vad betyder opartisk?", a: "Att inte hålla på någon sida." }
-        ],
-        reasoning: `Varför är det viktigt att domstolen är opartisk?`,
-        application: `Beskriv vad domstolen gör i ett brottmål.`
-      },
-      {
-        title: "Sida 5: Rättegången",
-        page: 5,
-        track: "Båda",
-        core: true,
-        text: `En rättegång är när ett fall tas upp i domstolen. Under rättegången får både åklagaren och den åtalade berätta vad de tycker har hänt.
+När domstolen har gått igenom allt fattar den ett beslut som kallas dom. Domen kan vara att personen fälls, alltså döms, eller frias, alltså inte döms. Det är ett viktigt beslut som påverkar både personen och samhället.
 
-Åklagaren börjar med att berätta vad personen är anklagad för och vilka bevis som finns. Sedan får den åtalade svara och ge sin version.
-
-Det finns också en försvarare som hjälper den åtalade. Försvararen ser till att den åtalades rättigheter följs.
-
-Vittnen kan också få berätta vad de sett. Domstolen lyssnar på alla och granskar bevisen.
-
-Efter rättegången tänker domstolen igenom allt och meddelar sin dom.`,
-        concepts: ["rättegång", "åtalad", "försvarare", "vittne", "bevis"],
-        mustKnow: [
-          "En rättegång är ett möte i domstolen.",
-          "Åklagaren och den åtalade får säga sin version.",
-          "Vittnen kan berätta vad de sett.",
-          "Domstolen avgör fallet efter rättegången."
-        ],
-        summary: [
-          "Rättegången prövar ett fall.",
-          "Båda sidor får komma till tals.",
-          "Bevis granskas.",
-          "Dom meddelas efteråt."
-        ],
-        test: [
-          { q: "Vad är en rättegång?", a: "Ett möte i domstolen där ett fall prövas." },
-          { q: "Vem börjar tala i en rättegång?", a: "Åklagaren." },
-          { q: "Vad gör en försvarare?", a: "Hjälper den åtalade." },
-          { q: "Vad händer efter rättegången?", a: "Domstolen meddelar en dom." }
-        ],
-        reasoning: `Varför är det viktigt att båda sidor får säga sin version?`,
-        application: `Förklara hur en rättegång går till i tre steg.`
-      },
-      {
-        title: "Sida 6: Bevis och rättvisa",
-        page: 6,
-        track: "Båda",
-        core: true,
-        text: `I rättssystemet är bevis mycket viktiga. Det räcker inte att tro att någon är skyldig. Det måste finnas bevis som visar vad som hänt.
-
-En person kan vara misstänkt, men det betyder inte att personen är skyldig. För att bli dömd måste det finnas tillräckligt starka bevis.
-
-Det finns en viktig princip som kallas hellre fria än fälla. Det betyder att det är bättre att fria en misstänkt än att döma en oskyldig.
-
-Bevis kan vara olika saker, till exempel vittnen eller filmer. Men alla bevis är inte lika starka.
-
-Rättssystemet måste vara noggrant för att vara rättvist.`,
-        concepts: ["bevis", "misstänkt", "dömd", "frias", "hellre fria än fälla"],
-        mustKnow: [
-          "Bevis behövs för att döma någon.",
-          "Misstänkt är inte samma som skyldig.",
-          "Hellre fria än fälla är en viktig princip.",
-          "Rättssystemet ska vara rättvist."
-        ],
-        summary: [
-          "Bevis är avgörande.",
-          "Misstankar räcker inte.",
-          "Alla ska behandlas rättvist.",
-          "Hellre fria än fälla skyddar människor."
-        ],
-        test: [
-          { q: "Vad krävs för att döma någon?", a: "Tillräckligt starka bevis." },
-          { q: "Vad betyder misstänkt?", a: "Att en person kan ha gjort brottet." },
-          { q: "Vad betyder hellre fria än fälla?", a: "Att det är bättre att fria än att döma utan bevis." },
-          { q: "Varför är bevis viktiga?", a: "För att visa vad som verkligen hänt." }
-        ],
-        reasoning: `Varför är det viktigt att inte döma någon utan tillräckliga bevis?`,
-        application: `Ge ett exempel där misstankar inte räcker för att döma någon.`
-      }
-    ]
-  }
-];
+Domstolen är därför en central del av rättssystemet. Genom att fatta beslut utifrån lagar och bevis hjälper den till att skapa rättvisa och trygghet i samhället.`,
+  concepts: ["domstol", "dom", "frias", "fällas", "opartisk", "bevis"],
+  mustKnow: [
+    "Domstolen avgör om någon ska dömas.",
+    "Domstolen ska vara opartisk.",
+    "Domstolen använder lagar och bevis.",
+    "Domstolen måste vara säker på att bevisen räcker för att döma.",
+    "Domen visar om någon fälls eller frias."
+  ],
+  summary: [
+    "Domstolen avgör vad som är rätt enligt lagen.",
+    "Domstolen ska vara opartisk.",
+    "Domstolen granskar bevis noggrant.",
+    "Domstolen måste vara säker innan någon döms.",
+    "Domen visar om personen frias eller fälls."
+  ],
+  test: [
+    { q: "Vad gör domstolen?", a: "Avgör om någon ska dömas eller inte." },
+    { q: "Vad betyder opartisk?", a: "Att inte hålla på någon sida." },
+    { q: "Vad krävs för att någon ska dömas?", a: "Att det finns tillräckliga bevis." },
+    { q: "Vad måste domstolen vara säker på innan den dömer?", a: "Att bevisen räcker för att döma." },
+    { q: "Vad är en dom?", a: "Domstolens beslut." }
+  ],
+  reasoning: `Varför är det viktigt att domstolen är säker på att bevisen räcker innan någon döms?`,
+  application: `Förklara med egna ord varför domstolen måste vara säker innan den dömer någon.`
+}
